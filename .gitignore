@@ -1,0 +1,48 @@
+# --- Node.js/React specific ignores ---
+# dependencies
+/node_modules
+
+# build output
+/build
+/dist
+/out
+/package
+
+# test/debug
+/coverage
+/.nyc_output
+/debug.log*
+/error.log*
+/npm-debug.log* # old npm debug log file
+
+# development
+/.env
+/.env.*
+!.env.production # Keep production env file if needed, but generally ignore all
+
+# optional: npm/yarn cache files
+/.npm
+/.yarn-cache
+
+# optional: lock files (uncomment if you regenerate these on build, but typically you want to commit them)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Next.js specific
+.next/
+out/
+
+# --- macOS specific ignores ---
+.DS_Store
+.localized
+._* # Resource forks
+
+# --- Editor/IDE specific ignores (add more as needed) ---
+.vscode/ # VS Code settings - might want to commit if shared settings are desired
+.idea/  # JetBrains IDEs
+
+# --- Other common ignores ---
+*.log
+*.swp # vim swap files
+.sass-cache/
