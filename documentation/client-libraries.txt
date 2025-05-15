@@ -1,0 +1,99 @@
+Text-to-Speech client libraries
+
+This page shows how to get started with the Cloud Client Libraries for the Text-to-Speech API. Client libraries make it easier to access Google Cloud APIs from a supported language. Although you can use Google Cloud APIs directly by making raw requests to the server, client libraries provide simplifications that significantly reduce the amount of code you need to write.
+
+Read more about the Cloud Client Libraries and the older Google API Client Libraries in Client libraries explained.
+
+Install the client library
+C++
+C#
+Go
+Java
+Node.js
+PHP
+Python
+Ruby
+
+npm install --save @google-cloud/text-to-speech
+
+For more information, see Setting Up a Node.js Development Environment.
+
+Set up authentication
+To authenticate calls to Google Cloud APIs, client libraries support Application Default Credentials (ADC); the libraries look for credentials in a set of defined locations and use those credentials to authenticate requests to the API. With ADC, you can make credentials available to your application in a variety of environments, such as local development or production, without needing to modify your application code.
+
+For production environments, the way you set up ADC depends on the service and context. For more information, see Set up Application Default Credentials.
+
+For a local development environment, you can set up ADC with the credentials that are associated with your Google Account:
+
+    After installing the Google Cloud CLI, sign in to the gcloud CLI with your federated identity and then initialize it by running the following command:
+
+gcloud init
+
+Create local authentication credentials for your user account:
+
+    gcloud auth application-default login
+
+    If an authentication error is returned, and you are using an external identity provider (IdP), confirm that you have signed in to the gcloud CLI with your federated identity.
+
+    A sign-in screen appears. After you sign in, your credentials are stored in the local credential file used by ADC.
+
+Use the client library
+
+The following example shows how to use the client library.
+C++
+Go
+Java
+Node.js
+Python
+
+// Imports the Google Cloud client library
+const textToSpeech = require('@google-cloud/text-to-speech');
+
+// Import other required libraries
+const {writeFile} = require('node:fs/promises');
+
+// Creates a client
+const client = new textToSpeech.TextToSpeechClient();
+
+async function quickStart() {
+  // The text to synthesize
+  const text = 'hello, world!';
+
+  // Construct the request
+  const request = {
+    input: {text: text},
+    // Select the language and SSML voice gender (optional)
+    voice: {languageCode: 'en-US', ssmlGender: 'NEUTRAL'},
+    // select the type of audio encoding
+    audioConfig: {audioEncoding: 'MP3'},
+  };
+
+  // Performs the text-to-speech request
+  const [response] = await client.synthesizeSpeech(request);
+
+  // Save the generated binary audio content to a local file
+  await writeFile('output.mp3', response.audioContent, 'binary');
+  console.log('Audio content written to file: output.mp3');
+}
+
+await quickStart();
+
+Additional resources
+C++
+C#
+Go
+Java
+Node.js
+PHP
+Python
+Ruby
+
+The following list contains links to more resources related to the client library for Node.js:
+
+    API reference
+    Client libraries best practices
+    Issue tracker
+    google-cloud-speech on Stack Overflow
+    Source code 
+
+Was this helpful?

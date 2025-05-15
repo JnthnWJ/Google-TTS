@@ -1,0 +1,61 @@
+Cloud Text-to-Speech API
+
+Synthesizes natural-sounding speech by applying powerful neural network models.
+Service: texttospeech.googleapis.com
+
+To call this service, we recommend that you use the Google-provided client libraries. If your application needs to use your own libraries to call this service, use the following information when you make the API requests.
+Discovery document
+
+A Discovery Document is a machine-readable specification for describing and consuming REST APIs. It is used to build client libraries, IDE plugins, and other tools that interact with Google APIs. One service may provide multiple discovery documents. This service provides the following discovery documents:
+
+    https://texttospeech.googleapis.com/$discovery/rest?version=v1
+    https://texttospeech.googleapis.com/$discovery/rest?version=v1beta1
+
+Service endpoint
+
+A service endpoint is a base URL that specifies the network address of an API service. One service might have multiple service endpoints. This service has the following service endpoint and all URIs below are relative to this service endpoint:
+
+    https://texttospeech.googleapis.com
+
+REST Resource: v1beta1.projects.locations
+Methods
+synthesizeLongAudio 	POST /v1beta1/{parent=projects/*/locations/*}:synthesizeLongAudio
+Synthesizes long form text asynchronously.
+REST Resource: v1beta1.projects.locations.operations
+Methods
+get 	GET /v1beta1/{name=projects/*/locations/*/operations/*}
+Gets the latest state of a long-running operation.
+list 	GET /v1beta1/{name=projects/*/locations/*}/operations
+Lists operations that match the specified filter in the request.
+REST Resource: v1beta1.text
+Methods
+synthesize 	POST /v1beta1/text:synthesize
+Synthesizes speech synchronously: receive results after all text input has been processed.
+REST Resource: v1beta1.voices
+Methods
+list 	GET /v1beta1/voices
+Returns a list of Voice supported for synthesis.
+REST Resource: v1.operations
+Methods
+cancel 	POST /v1/{name=operations/**}:cancel
+Starts asynchronous cancellation on a long-running operation.
+delete 	DELETE /v1/{name=operations/**}
+Deletes a long-running operation.
+REST Resource: v1.projects.locations
+Methods
+synthesizeLongAudio 	POST /v1/{parent=projects/*/locations/*}:synthesizeLongAudio
+Synthesizes long form text asynchronously.
+REST Resource: v1.projects.locations.operations
+Methods
+get 	GET /v1/{name=projects/*/locations/*/operations/*}
+Gets the latest state of a long-running operation.
+list 	GET /v1/{name=projects/*/locations/*}/operations
+Lists operations that match the specified filter in the request.
+REST Resource: v1.text
+Methods
+synthesize 	POST /v1/text:synthesize
+Synthesizes speech synchronously: receive results after all text input has been processed.
+REST Resource: v1.voices
+Methods
+list 	GET /v1/voices
+Returns a list of Voice supported for synthesis.
