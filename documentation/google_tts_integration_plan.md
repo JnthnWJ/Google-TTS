@@ -57,15 +57,15 @@ Before beginning the integration, ensure you have:
 
 2. **Grant the service account the necessary permissions**:
    ```bash
-   gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-     --member="serviceAccount:tts-service-account@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+   gcloud projects add-iam-policy-binding j-reader \
+     --member="serviceAccount:tts-service-account@j-reader.iam.gserviceaccount.com" \
      --role="roles/cloudtexttospeech.user"
    ```
 
 3. **Generate and download a service account key**:
    ```bash
    gcloud iam service-accounts keys create ./google-credentials.json \
-     --iam-account=tts-service-account@YOUR_PROJECT_ID.iam.gserviceaccount.com
+     --iam-account=tts-service-account@j-reader.iam.gserviceaccount.com
    ```
 
 4. **Secure the credentials file**:

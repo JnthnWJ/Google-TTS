@@ -46,3 +46,4 @@ out/
 *.log
 *.swp # vim swap files
 .sass-cache/
+google-credentials.json
