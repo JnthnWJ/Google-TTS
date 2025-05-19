@@ -4,25 +4,25 @@ This document outlines a comprehensive implementation plan for integrating Googl
 
 ## Table of Contents
 1. [Introduction](#introduction)
-2. [Prerequisites](#prerequisites)
-3. [Setting Up Google Cloud Project](#setting-up-google-cloud-project)
-4. [Authentication Setup](#authentication-setup)
-5. [Installing Dependencies](#installing-dependencies)
-6. [API Integration](#api-integration)
-7. [Audio File Handling](#audio-file-handling)
-8. [User Interface Modifications](#user-interface-modifications)
-9. [Performance Optimization](#performance-optimization)
-10. [Cost Management](#cost-management)
-11. [Offline Fallback](#offline-fallback)
-12. [Testing Procedures](#testing-procedures)
-13. [Security Considerations](#security-considerations)
-14. [Deployment Checklist](#deployment-checklist)
+2. [Prerequisites](#prerequisites) ✅
+3. [Setting Up Google Cloud Project](#setting-up-google-cloud-project) ✅
+4. [Authentication Setup](#authentication-setup) ✅
+5. [Installing Dependencies](#installing-dependencies) ✅
+6. [API Integration](#api-integration) ✅
+7. [Audio File Handling](#audio-file-handling) ✅
+8. [User Interface Modifications](#user-interface-modifications) ✅
+9. [Performance Optimization](#performance-optimization) ⏳
+10. [Cost Management](#cost-management) ⏳
+11. [Offline Fallback](#offline-fallback) ⏳
+12. [Testing Procedures](#testing-procedures) ⏳
+13. [Security Considerations](#security-considerations) ⏳
+14. [Deployment Checklist](#deployment-checklist) ⏳
 
 ## Introduction
 
 Google Cloud Text-to-Speech API provides high-quality speech synthesis with a wide range of voices and languages. This integration will enhance our application by providing more natural-sounding voices, additional language options, and improved audio quality.
 
-## Prerequisites
+## Prerequisites ✅
 
 Before beginning the integration, ensure you have:
 
@@ -31,494 +31,104 @@ Before beginning the integration, ensure you have:
 - Basic familiarity with Google Cloud services
 - Access to the existing text-to-speech application codebase
 
-## Setting Up Google Cloud Project
+## Setting Up Google Cloud Project ✅
 
-1. **Create a new Google Cloud Project**:
+1. **Create a new Google Cloud Project**: ✅
    - Go to the [Google Cloud Console](https://console.cloud.google.com/)
    - Click "New Project" and provide a name (e.g., "tts-application")
    - Click "Create"
 
-2. **Enable the Text-to-Speech API**:
+2. **Enable the Text-to-Speech API**: ✅
    - In the Google Cloud Console, navigate to "APIs & Services" > "Library"
    - Search for "Text-to-Speech API"
    - Click on the API and then click "Enable"
 
-3. **Set up billing**:
+3. **Set up billing**: ✅
    - Ensure billing is enabled for your project
    - Consider setting up budget alerts to monitor costs
 
-## Authentication Setup
+## Authentication Setup ✅
 
-1. **Create a service account**:
+1. **Create a service account**: ✅
    ```bash
    gcloud iam service-accounts create tts-service-account \
      --display-name="Text-to-Speech Service Account"
    ```
 
-2. **Grant the service account the necessary permissions**:
+2. **Grant the service account the necessary permissions**: ✅
    ```bash
    gcloud projects add-iam-policy-binding j-reader \
      --member="serviceAccount:tts-service-account@j-reader.iam.gserviceaccount.com" \
      --role="roles/cloudtexttospeech.user"
    ```
 
-3. **Generate and download a service account key**:
+3. **Generate and download a service account key**: ✅
    ```bash
    gcloud iam service-accounts keys create ./google-credentials.json \
      --iam-account=tts-service-account@j-reader.iam.gserviceaccount.com
    ```
 
-4. **Secure the credentials file**:
+4. **Secure the credentials file**: ✅
    - Add `google-credentials.json` to `.gitignore`
    - Store the file securely and restrict access
    - For production, consider using environment variables or a secret management service
 
-## Installing Dependencies
+## Installing Dependencies ✅
 
-1. **Install the Google Cloud Text-to-Speech client library**:
+1. **Install the Google Cloud Text-to-Speech client library**: ✅
    ```bash
    npm install --save @google-cloud/text-to-speech
    ```
 
-2. **Install additional dependencies for audio handling**:
+2. **Install additional dependencies for audio handling**: ✅
    ```bash
-   npm install --save howler
+   npm install --save howler uuid @types/uuid
    ```
 
-## API Integration
+## API Integration ✅
 
-1. **Create a service file for Google TTS integration**:
+1. **Create a service file for Google TTS integration**: ✅
 
-Create a new file at `lib/google-tts-service.ts`:
+Created a new file at `lib/google-tts-service.ts` with the following functionality:
+- Client initialization with credentials
+- Interface definitions for TTS requests and responses
+- Speech synthesis function with configurable parameters
+- Function to retrieve available voices
 
-```typescript
-import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
-import util from 'util';
-import path from 'path';
+2. **Create an API route handler for the TTS service**: ✅
 
-// Create a client with explicit credentials
-const client = new TextToSpeechClient({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS || './google-credentials.json',
-});
+Created a new file at `app/api/tts/route.ts` with the following functionality:
+- POST endpoint for speech synthesis
+- GET endpoint for retrieving available voices
+- Audio file storage in the public directory
+- Error handling and response formatting
 
-export interface TTSRequest {
-  text: string;
-  languageCode?: string;
-  voiceName?: string;
-  ssmlGender?: 'NEUTRAL' | 'MALE' | 'FEMALE' | 'SSML_VOICE_GENDER_UNSPECIFIED';
-  audioEncoding?: 'MP3' | 'LINEAR16' | 'OGG_OPUS' | 'MULAW' | 'ALAW';
-  speakingRate?: number;
-  pitch?: number;
-  volumeGainDb?: number;
-}
+## Audio File Handling ✅
 
-export interface TTSResponse {
-  audioContent: Uint8Array;
-  audioUrl?: string;
-  fileName: string;
-}
+1. **Create an audio player service**: ✅
 
-export async function synthesizeSpeech({
-  text,
-  languageCode = 'en-US',
-  voiceName = 'en-US-Neural2-F',
-  ssmlGender = 'FEMALE',
-  audioEncoding = 'MP3',
-  speakingRate = 1.0,
-  pitch = 0.0,
-  volumeGainDb = 0.0,
-}: TTSRequest): Promise<TTSResponse> {
-  try {
-    // Construct the request
-    const request = {
-      input: { text },
-      voice: {
-        languageCode,
-        name: voiceName,
-        ssmlGender,
-      },
-      audioConfig: {
-        audioEncoding,
-        speakingRate,
-        pitch,
-        volumeGainDb,
-      },
-    };
+Created a new file at `lib/audio-player-service.ts` with the following functionality:
+- Singleton pattern for audio player instance
+- Methods for audio playback control (play, pause, stop)
+- Audio loading and unloading
+- Volume and playback rate control
+- Position seeking and duration information
+- Event handling for audio playback events
 
-    // Perform the text-to-speech request
-    const [response] = await client.synthesizeSpeech(request);
-    
-    // Generate a unique filename
-    const fileName = `tts-${uuidv4()}.mp3`;
-    
-    return {
-      audioContent: response.audioContent as Uint8Array,
-      fileName,
-    };
-  } catch (error) {
-    console.error('Error synthesizing speech:', error);
-    throw error;
-  }
-}
+## User Interface Modifications ✅
 
-export async function getAvailableVoices(languageCode?: string) {
-  try {
-    const [result] = await client.listVoices({ languageCode });
-    return result.voices || [];
-  } catch (error) {
-    console.error('Error fetching voices:', error);
-    throw error;
-  }
-}
-```
+1. **Update the TextToSpeechApp component**: ✅
 
-2. **Create an API route handler for the TTS service**:
-
-Create a new file at `app/api/tts/route.ts`:
-
-```typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { synthesizeSpeech, getAvailableVoices } from '@/lib/google-tts-service';
-import fs from 'fs';
-import path from 'path';
-import { writeFile } from 'fs/promises';
-
-// Create a directory for audio files if it doesn't exist
-const audioDir = path.join(process.cwd(), 'public', 'audio');
-if (!fs.existsSync(audioDir)) {
-  fs.mkdirSync(audioDir, { recursive: true });
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { text, languageCode, voiceName, ssmlGender, speakingRate, pitch } = body;
-    
-    if (!text) {
-      return NextResponse.json({ error: 'Text is required' }, { status: 400 });
-    }
-    
-    const result = await synthesizeSpeech({
-      text,
-      languageCode,
-      voiceName,
-      ssmlGender,
-      speakingRate,
-      pitch,
-    });
-    
-    // Save the audio file to the public directory
-    const filePath = path.join(audioDir, result.fileName);
-    await writeFile(filePath, result.audioContent);
-    
-    // Return the URL to the audio file
-    const audioUrl = `/audio/${result.fileName}`;
-    
-    return NextResponse.json({ 
-      success: true, 
-      audioUrl,
-      fileName: result.fileName
-    });
-  } catch (error: any) {
-    console.error('Error in TTS API route:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const languageCode = searchParams.get('languageCode') || undefined;
-    
-    const voices = await getAvailableVoices(languageCode);
-    
-    return NextResponse.json({ voices });
-  } catch (error: any) {
-    console.error('Error fetching voices:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-```
-
-## Audio File Handling
-
-1. **Create an audio player service**:
-
-Create a new file at `lib/audio-player-service.ts`:
-
-```typescript
-import { Howl } from 'howler';
-
-class AudioPlayerService {
-  private static instance: AudioPlayerService;
-  private sound: Howl | null = null;
-  private currentAudioUrl: string | null = null;
-
-  private constructor() {}
-
-  public static getInstance(): AudioPlayerService {
-    if (!AudioPlayerService.instance) {
-      AudioPlayerService.instance = new AudioPlayerService();
-    }
-    return AudioPlayerService.instance;
-  }
-
-  public loadAudio(audioUrl: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.sound) {
-        this.sound.stop();
-        this.sound.unload();
-      }
-
-      this.currentAudioUrl = audioUrl;
-      this.sound = new Howl({
-        src: [audioUrl],
-        html5: true,
-        onload: () => resolve(),
-        onloaderror: (id, error) => reject(error),
-      });
-    });
-  }
-
-  public play(): void {
-    if (this.sound) {
-      this.sound.play();
-    }
-  }
-
-  public pause(): void {
-    if (this.sound) {
-      this.sound.pause();
-    }
-  }
-
-  public stop(): void {
-    if (this.sound) {
-      this.sound.stop();
-    }
-  }
-
-  public setVolume(volume: number): void {
-    if (this.sound) {
-      this.sound.volume(volume);
-    }
-  }
-
-  public setRate(rate: number): void {
-    if (this.sound) {
-      this.sound.rate(rate);
-    }
-  }
-
-  public getDuration(): number {
-    return this.sound ? this.sound.duration() : 0;
-  }
-
-  public getCurrentTime(): number {
-    return this.sound ? this.sound.seek() as number : 0;
-  }
-
-  public seek(position: number): void {
-    if (this.sound) {
-      this.sound.seek(position);
-    }
-  }
-
-  public onEnd(callback: () => void): void {
-    if (this.sound) {
-      this.sound.on('end', callback);
-    }
-  }
-
-  public getCurrentAudioUrl(): string | null {
-    return this.currentAudioUrl;
-  }
-}
-
-export default AudioPlayerService;
-```
-
-## User Interface Modifications
-
-1. **Update the TextToSpeechApp component**:
-
-Modify the existing `components/text-to-speech-app.tsx` file to integrate with Google TTS:
-
-```typescript
-// Add imports for the TTS service and audio player
-import { useEffect, useState, useRef } from "react";
-import { useToast } from "@/hooks/use-toast";
-import AudioPlayerService from "@/lib/audio-player-service";
-
-// Add state variables for Google TTS
-const [voices, setVoices] = useState([]);
-const [selectedVoice, setSelectedVoice] = useState("");
-const [languageCode, setLanguageCode] = useState("en-US");
-const [isLoading, setIsLoading] = useState(false);
-const [audioUrl, setAudioUrl] = useState("");
-const audioPlayer = useRef(AudioPlayerService.getInstance());
-const { toast } = useToast();
-
-// Add function to fetch available voices
-useEffect(() => {
-  async function fetchVoices() {
-    try {
-      const response = await fetch(`/api/tts?languageCode=${languageCode}`);
-      const data = await response.json();
-      if (data.voices) {
-        setVoices(data.voices);
-        // Set default voice if available
-        if (data.voices.length > 0) {
-          setSelectedVoice(data.voices[0].name);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching voices:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load available voices",
-        variant: "destructive",
-      });
-    }
-  }
-  
-  fetchVoices();
-}, [languageCode]);
-
-// Add function to generate speech
-async function generateSpeech() {
-  if (!text.trim()) {
-    toast({
-      title: "Error",
-      description: "Please enter some text to convert to speech",
-      variant: "destructive",
-    });
-    return;
-  }
-  
-  setIsLoading(true);
-  
-  try {
-    const response = await fetch("/api/tts", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        languageCode,
-        voiceName: selectedVoice,
-        speakingRate: speed,
-        pitch: pitch - 1, // Adjust pitch to match Google's scale (-10 to 10)
-      }),
-    });
-    
-    const data = await response.json();
-    
-    if (data.audioUrl) {
-      setAudioUrl(data.audioUrl);
-      await audioPlayer.current.loadAudio(data.audioUrl);
-      setDuration(audioPlayer.current.getDuration());
-      setIsPlaying(true);
-      audioPlayer.current.play();
-    } else {
-      throw new Error(data.error || "Failed to generate speech");
-    }
-  } catch (error) {
-    console.error("Error generating speech:", error);
-    toast({
-      title: "Error",
-      description: "Failed to generate speech",
-      variant: "destructive",
-    });
-  } finally {
-    setIsLoading(false);
-  }
-}
-
-// Update the togglePlay function
-const togglePlay = () => {
-  if (!audioUrl) {
-    generateSpeech();
-    return;
-  }
-  
-  if (isPlaying) {
-    audioPlayer.current.pause();
-  } else {
-    audioPlayer.current.play();
-  }
-  
-  setIsPlaying(!isPlaying);
-};
-
-// Add audio player event listeners
-useEffect(() => {
-  if (audioPlayer.current) {
-    audioPlayer.current.onEnd(() => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    });
-    
-    // Update current time during playback
-    const interval = setInterval(() => {
-      if (isPlaying) {
-        setCurrentTime(audioPlayer.current.getCurrentTime());
-      }
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }
-}, [isPlaying]);
-
-// Update the UI to include language selection and voice selection
-// Replace the existing voice selection with:
-<div>
-  <label className="block text-sm font-medium mb-2">Language</label>
-  <Select value={languageCode} onValueChange={setLanguageCode}>
-    <SelectTrigger className="bg-white/10 border-white/20 backdrop-blur-sm rounded-xl text-white">
-      <SelectValue placeholder="Select a language" />
-    </SelectTrigger>
-    <SelectContent className="bg-white/80 backdrop-blur-xl border-white/30">
-      <SelectItem value="en-US">English (US)</SelectItem>
-      <SelectItem value="en-GB">English (UK)</SelectItem>
-      <SelectItem value="es-ES">Spanish</SelectItem>
-      <SelectItem value="fr-FR">French</SelectItem>
-      <SelectItem value="de-DE">German</SelectItem>
-      <SelectItem value="ja-JP">Japanese</SelectItem>
-      <SelectItem value="ko-KR">Korean</SelectItem>
-      <SelectItem value="zh-CN">Chinese (Simplified)</SelectItem>
-    </SelectContent>
-  </Select>
-</div>
-
-<div>
-  <label className="block text-sm font-medium mb-2">Voice</label>
-  <Select value={selectedVoice} onValueChange={setSelectedVoice}>
-    <SelectTrigger className="bg-white/10 border-white/20 backdrop-blur-sm rounded-xl text-white">
-      <SelectValue placeholder="Select a voice" />
-    </SelectTrigger>
-    <SelectContent className="bg-white/80 backdrop-blur-xl border-white/30">
-      {voices.map((voice) => (
-        <SelectItem key={voice.name} value={voice.name}>
-          {voice.name} ({voice.ssmlGender})
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
-
-// Add a Generate button
-<Button 
-  onClick={generateSpeech}
-  disabled={isLoading || !text.trim()}
-  className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
->
-  {isLoading ? "Generating..." : "Generate Speech"}
-</Button>
-```
+Modified the existing `components/text-to-speech-app.tsx` file to integrate with Google TTS with the following changes:
+- Added state variables for voices, language selection, and loading state
+- Implemented function to fetch available voices based on selected language
+- Added speech generation functionality with configurable parameters
+- Updated audio player controls to work with the audio player service
+- Added language selection dropdown with multiple language options
+- Implemented dynamic voice selection based on the selected language
+- Added loading indicators and error handling
+- Implemented download functionality for generated audio
+- Added reset functionality to clear the form
 
 ## Performance Optimization
 //Don't start on this until explicity prompted!!
@@ -581,7 +191,7 @@ useEffect(() => {
    - Implement rate limiting to prevent abuse
    - Set maximum text length limits
 
-3. 
+3.
 ## Deployment Checklist
 
 1. **Environment Configuration**:
