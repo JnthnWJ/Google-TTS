@@ -521,7 +521,7 @@ useEffect(() => {
 ```
 
 ## Performance Optimization
-
+//Don't start on this until explicity prompted!!
 1. **Implement caching for generated audio files**:
    - Store generated audio files with unique identifiers
    - Check cache before generating new audio for identical requests
@@ -552,56 +552,6 @@ useEffect(() => {
    - Standard voices are less expensive than WaveNet or Neural2 voices
    - Select the appropriate quality based on use case
 
-## Offline Fallback
-
-1. **Implement browser's built-in speech synthesis as fallback**:
-
-```typescript
-function useBrowserTTS(text: string, options = {}) {
-  if (!window.speechSynthesis) {
-    return false;
-  }
-  
-  const utterance = new SpeechSynthesisUtterance(text);
-  
-  // Apply options
-  if (options.rate) utterance.rate = options.rate;
-  if (options.pitch) utterance.pitch = options.pitch;
-  if (options.voice) utterance.voice = options.voice;
-  
-  window.speechSynthesis.speak(utterance);
-  return true;
-}
-```
-
-2. **Cache previously generated audio for offline use**:
-   - Use IndexedDB or localStorage to store audio data
-   - Implement a service worker for offline access
-
-## Testing Procedures
-
-1. **Unit Testing**:
-   - Test the TTS service functions in isolation
-   - Mock API responses for predictable testing
-   - Test error handling and edge cases
-
-```typescript
-// Example Jest test for the TTS service
-describe('Google TTS Service', () => {
-  test('synthesizeSpeech should return audio content', async () => {
-    // Mock the TextToSpeechClient
-    const mockSynthesizeSpeech = jest.fn().mockResolvedValue([
-      { audioContent: new Uint8Array([1, 2, 3]) }
-    ]);
-    
-    // Test the function
-    const result = await synthesizeSpeech({ text: 'Hello world' });
-    
-    expect(result.audioContent).toBeDefined();
-    expect(result.fileName).toMatch(/tts-.*\.mp3/);
-  });
-});
-```
 
 2. **Integration Testing**:
    - Test the API routes with actual requests
@@ -631,16 +581,7 @@ describe('Google TTS Service', () => {
    - Implement rate limiting to prevent abuse
    - Set maximum text length limits
 
-3. **Data Privacy**:
-   - Inform users about data sent to Google Cloud
-   - Consider implementing data retention policies
-   - Ensure compliance with relevant privacy regulations (GDPR, CCPA)
-
-4. **Secure Audio Storage**:
-   - Implement proper access controls for generated audio files
-   - Consider encrypting sensitive audio content
-   - Implement automatic cleanup of old files
-
+3. 
 ## Deployment Checklist
 
 1. **Environment Configuration**:
