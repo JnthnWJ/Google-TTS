@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Download, Pause, Play, Volume2, VolumeX } from "lucide-react"
+import AudioPlayerService from "@/lib/audio-player-service"
+import { useToast } from "@/hooks/use-toast"
 
 export default function TextToSpeechApp() {
   const [text, setText] = useState("")
@@ -14,14 +16,164 @@ export default function TextToSpeechApp() {
   const [currentTime, setCurrentTime] = useState(0)
   const [speed, setSpeed] = useState(1)
   const [pitch, setPitch] = useState(1)
-  const duration = 100 // Mock duration
+  const [duration, setDuration] = useState(0)
+  const [voices, setVoices] = useState<any[]>([])
+  const [selectedVoice, setSelectedVoice] = useState("")
+  const [languageCode, setLanguageCode] = useState("en-US")
+  const [isLoading, setIsLoading] = useState(false)
+  const [audioUrl, setAudioUrl] = useState("")
+  const audioPlayer = useRef(AudioPlayerService.getInstance())
+  const { toast } = useToast()
+
+  // Fetch available voices when language changes
+  useEffect(() => {
+    async function fetchVoices() {
+      try {
+        const response = await fetch(`/api/tts?languageCode=${languageCode}`);
+        const data = await response.json();
+        if (data.voices) {
+          setVoices(data.voices);
+          // Set default voice if available
+          if (data.voices.length > 0) {
+            setSelectedVoice(data.voices[0].name);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching voices:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load available voices",
+          variant: "destructive",
+        });
+      }
+    }
+
+    fetchVoices();
+  }, [languageCode, toast]);
+
+  // Add audio player event listeners
+  useEffect(() => {
+    if (audioPlayer.current) {
+      audioPlayer.current.onEnd(() => {
+        setIsPlaying(false);
+        setCurrentTime(0);
+      });
+
+      // Update current time during playback
+      const interval = setInterval(() => {
+        if (isPlaying) {
+          setCurrentTime(audioPlayer.current.getCurrentTime());
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isPlaying]);
+
+  // Generate speech from text
+  async function generateSpeech() {
+    if (!text.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter some text to convert to speech",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text,
+          languageCode,
+          voiceName: selectedVoice,
+          speakingRate: speed,
+          pitch: pitch - 1, // Adjust pitch to match Google's scale (-10 to 10)
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.audioUrl) {
+        setAudioUrl(data.audioUrl);
+        await audioPlayer.current.loadAudio(data.audioUrl);
+        setDuration(audioPlayer.current.getDuration());
+        setIsPlaying(true);
+        audioPlayer.current.play();
+      } else {
+        throw new Error(data.error || "Failed to generate speech");
+      }
+    } catch (error) {
+      console.error("Error generating speech:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate speech",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   const togglePlay = () => {
-    setIsPlaying(!isPlaying)
+    if (!audioUrl) {
+      generateSpeech();
+      return;
+    }
+
+    if (isPlaying) {
+      audioPlayer.current.pause();
+    } else {
+      audioPlayer.current.play();
+    }
+
+    setIsPlaying(!isPlaying);
   }
 
   const toggleMute = () => {
-    setIsMuted(!isMuted)
+    audioPlayer.current.setVolume(isMuted ? 1 : 0);
+    setIsMuted(!isMuted);
+  }
+
+  const handleSeek = (value: number[]) => {
+    const newPosition = value[0];
+    setCurrentTime(newPosition);
+    audioPlayer.current.seek(newPosition);
+  }
+
+  const handleDownload = () => {
+    if (audioUrl) {
+      const link = document.createElement('a');
+      link.href = audioUrl;
+      link.download = audioUrl.split('/').pop() || 'speech.mp3';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      toast({
+        title: "Error",
+        description: "No audio available to download",
+        variant: "destructive",
+      });
+    }
+  }
+
+  const handleReset = () => {
+    setText("");
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setSpeed(1);
+    setPitch(1);
+    setAudioUrl("");
+    if (audioPlayer.current) {
+      audioPlayer.current.stop();
+    }
   }
 
   return (
@@ -44,31 +196,36 @@ export default function TextToSpeechApp() {
           {/* Voice Selection */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium mb-2">Voice</label>
-              <Select>
+              <label className="block text-sm font-medium mb-2">Language</label>
+              <Select value={languageCode} onValueChange={setLanguageCode}>
                 <SelectTrigger className="bg-white/10 border-white/20 backdrop-blur-sm rounded-xl text-white">
-                  <SelectValue placeholder="Select a voice" />
+                  <SelectValue placeholder="Select a language" />
                 </SelectTrigger>
                 <SelectContent className="bg-white/80 backdrop-blur-xl border-white/30">
-                  <SelectItem value="alloy">Alloy</SelectItem>
-                  <SelectItem value="echo">Echo</SelectItem>
-                  <SelectItem value="fable">Fable</SelectItem>
-                  <SelectItem value="onyx">Onyx</SelectItem>
-                  <SelectItem value="nova">Nova</SelectItem>
-                  <SelectItem value="shimmer">Shimmer</SelectItem>
+                  <SelectItem value="en-US">English (US)</SelectItem>
+                  <SelectItem value="en-GB">English (UK)</SelectItem>
+                  <SelectItem value="es-ES">Spanish</SelectItem>
+                  <SelectItem value="fr-FR">French</SelectItem>
+                  <SelectItem value="de-DE">German</SelectItem>
+                  <SelectItem value="ja-JP">Japanese</SelectItem>
+                  <SelectItem value="ko-KR">Korean</SelectItem>
+                  <SelectItem value="zh-CN">Chinese (Simplified)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Model</label>
-              <Select>
+              <label className="block text-sm font-medium mb-2">Voice</label>
+              <Select value={selectedVoice} onValueChange={setSelectedVoice}>
                 <SelectTrigger className="bg-white/10 border-white/20 backdrop-blur-sm rounded-xl text-white">
-                  <SelectValue placeholder="Select a model" />
+                  <SelectValue placeholder="Select a voice" />
                 </SelectTrigger>
                 <SelectContent className="bg-white/80 backdrop-blur-xl border-white/30">
-                  <SelectItem value="tts-1">TTS-1</SelectItem>
-                  <SelectItem value="tts-1-hd">TTS-1-HD</SelectItem>
+                  {voices.map((voice) => (
+                    <SelectItem key={voice.name} value={voice.name}>
+                      {voice.name} ({voice.ssmlGender})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -135,17 +292,25 @@ export default function TextToSpeechApp() {
                 variant="ghost"
                 size="icon"
                 className="h-12 w-12 rounded-full bg-white/20 hover:bg-white/30 text-white"
+                disabled={isLoading}
               >
-                {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+                {isLoading ? (
+                  <div className="h-6 w-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : isPlaying ? (
+                  <Pause className="h-6 w-6" />
+                ) : (
+                  <Play className="h-6 w-6" />
+                )}
               </Button>
 
               <div className="flex-1">
                 <Slider
                   value={[currentTime]}
-                  max={duration}
-                  step={1}
+                  max={duration || 100}
+                  step={0.1}
                   className="py-1"
-                  onValueChange={(value) => setCurrentTime(value[0])}
+                  onValueChange={handleSeek}
+                  disabled={!audioUrl || isLoading}
                 />
                 <div className="flex justify-between text-xs mt-1">
                   <span>{formatTime(currentTime)}</span>
@@ -158,6 +323,7 @@ export default function TextToSpeechApp() {
                 variant="ghost"
                 size="icon"
                 className="rounded-full bg-white/10 hover:bg-white/20 text-white"
+                disabled={!audioUrl || isLoading}
               >
                 {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
               </Button>
@@ -169,12 +335,25 @@ export default function TextToSpeechApp() {
             <Button
               variant="outline"
               className="border-white/30 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+              onClick={handleReset}
+              disabled={isLoading}
             >
               Reset
             </Button>
-            <Button className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm flex gap-2 items-center">
+            <Button
+              className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm flex gap-2 items-center"
+              onClick={handleDownload}
+              disabled={!audioUrl || isLoading}
+            >
               <Download className="h-4 w-4" />
               Download Audio
+            </Button>
+            <Button
+              onClick={generateSpeech}
+              disabled={isLoading || !text.trim()}
+              className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
+            >
+              {isLoading ? "Generating..." : "Generate Speech"}
             </Button>
           </div>
         </div>
