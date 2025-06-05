@@ -1,6 +1,16 @@
-# Google Cloud Text-to-Speech Integration
+# Text-to-Speech Integration
 
-This document provides instructions for setting up and using the Google Cloud Text-to-Speech integration in the application.
+This document provides instructions for setting up and using both Google Cloud Text-to-Speech and Kokoro Local TTS in the application.
+
+## 🆕 **NEW: Kokoro Local TTS Support**
+
+The application now supports **Kokoro TTS** - a local, privacy-focused alternative that runs entirely in your browser!
+
+- ✅ **100% Local Processing** - No data sent to external servers
+- ✅ **28 High-Quality Voices** - American and British English
+- ✅ **Privacy-Focused** - GDPR compliant, no API keys required
+- ✅ **Real-time Generation** - Fast synthesis after initial setup
+- ✅ **Easy Toggle** - Switch between Google and Kokoro with one click
 
 ## Implementation Status
 

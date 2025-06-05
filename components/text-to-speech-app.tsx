@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Download, Pause, Play, Volume2, VolumeX } from "lucide-react"
 import AudioPlayerService from "@/lib/audio-player-service"
 import { useToast } from "@/hooks/use-toast"
+import ProviderToggle, { TTSProvider } from "@/components/ui/provider-toggle"
 
 export default function TextToSpeechApp() {
   const [text, setText] = useState("")
@@ -22,14 +23,24 @@ export default function TextToSpeechApp() {
   const [languageCode, setLanguageCode] = useState("en-US")
   const [isLoading, setIsLoading] = useState(false)
   const [audioUrl, setAudioUrl] = useState("")
+  const [selectedProvider, setSelectedProvider] = useState<TTSProvider>('google')
+  const [kokoroInitialized, setKokoroInitialized] = useState(false)
   const audioPlayer = useRef(AudioPlayerService.getInstance())
   const { toast } = useToast()
 
-  // Fetch available voices when language changes
+  // Initialize provider from localStorage
+  useEffect(() => {
+    const savedProvider = localStorage.getItem('tts-provider') as TTSProvider
+    if (savedProvider && (savedProvider === 'google' || savedProvider === 'kokoro')) {
+      setSelectedProvider(savedProvider)
+    }
+  }, [])
+
+  // Fetch available voices when language or provider changes
   useEffect(() => {
     async function fetchVoices() {
       try {
-        const response = await fetch(`/api/tts?languageCode=${languageCode}`);
+        const response = await fetch(`/api/tts?languageCode=${languageCode}&provider=${selectedProvider}`);
         const data = await response.json();
         if (data.voices) {
           setVoices(data.voices);
@@ -49,7 +60,7 @@ export default function TextToSpeechApp() {
     }
 
     fetchVoices();
-  }, [languageCode, toast]);
+  }, [languageCode, selectedProvider, toast]);
 
   // Add audio player event listeners
   useEffect(() => {
@@ -91,32 +102,10 @@ export default function TextToSpeechApp() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text,
-          languageCode,
-          voiceName: selectedVoice,
-          speakingRate: 1.0, // Use fixed normal speed for TTS generation
-          pitch: pitch - 1, // Adjust pitch to match Google's scale (-10 to 10)
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.audioUrl) {
-        setAudioUrl(data.audioUrl);
-        await audioPlayer.current.loadAudio(data.audioUrl);
-        setDuration(audioPlayer.current.getDuration());
-        // Apply current playback rate to the audio
-        audioPlayer.current.setRate(playbackRate);
-        setIsPlaying(true);
-        audioPlayer.current.play();
+      if (selectedProvider === 'kokoro') {
+        await generateSpeechWithKokoro();
       } else {
-        throw new Error(data.error || "Failed to generate speech");
+        await generateSpeechWithGoogle();
       }
     } catch (error) {
       console.error("Error generating speech:", error);
@@ -127,6 +116,120 @@ export default function TextToSpeechApp() {
       });
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function generateSpeechWithGoogle() {
+    const response = await fetch("/api/tts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text,
+        provider: 'google',
+        languageCode,
+        voiceName: selectedVoice,
+        speakingRate: 1.0,
+        pitch: pitch - 1, // Adjust pitch for Google's scale (-10 to 10)
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.audioUrl) {
+      setAudioUrl(data.audioUrl);
+      await audioPlayer.current.loadAudio(data.audioUrl);
+      setDuration(audioPlayer.current.getDuration());
+      audioPlayer.current.setRate(playbackRate);
+      setIsPlaying(true);
+      audioPlayer.current.play();
+    } else {
+      throw new Error(data.error || "Failed to generate speech");
+    }
+  }
+
+  async function generateSpeechWithKokoro() {
+    try {
+      if (!kokoroInitialized) {
+        // Show loading message for Kokoro
+        toast({
+          title: "Initializing Kokoro TTS",
+          description: "Loading model... This may take a moment on first use.",
+        });
+      }
+
+      // Import Kokoro dynamically
+      let KokoroTTS;
+      try {
+        const kokoroModule = await import('kokoro-js');
+        KokoroTTS = kokoroModule.KokoroTTS;
+      } catch (importError) {
+        console.error('Failed to import kokoro-js:', importError);
+        throw new Error('Kokoro TTS is temporarily disabled due to Next.js compatibility issues. Please use Google TTS instead.');
+      }
+
+      // Initialize Kokoro if not already done
+      const modelId = "onnx-community/Kokoro-82M-v1.0-ONNX";
+      const tts = await KokoroTTS.from_pretrained(modelId, {
+        dtype: "q8",
+        device: "wasm",
+      });
+
+      setKokoroInitialized(true);
+
+      toast({
+        title: "Generating Speech",
+        description: "Creating audio with Kokoro TTS...",
+      });
+
+      // Generate audio
+      const audio = await tts.generate(text, {
+        voice: selectedVoice || 'af_heart',
+      });
+
+      // Try different ways to get the audio data
+      let audioData: ArrayBuffer | Uint8Array;
+
+      if (audio.save && typeof audio.save === 'function') {
+        // Try the save method first
+        audioData = await audio.save();
+      } else if (audio.data) {
+        audioData = audio.data;
+      } else if (audio.buffer) {
+        audioData = audio.buffer;
+      } else {
+        audioData = audio;
+      }
+
+      // Convert to Uint8Array if needed
+      const audioArray = audioData instanceof ArrayBuffer ? new Uint8Array(audioData) : audioData;
+
+      // Create blob and URL
+      const audioBlob = new Blob([audioArray], { type: 'audio/wav' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      setAudioUrl(audioUrl);
+      await audioPlayer.current.loadAudio(audioUrl);
+      setDuration(audioPlayer.current.getDuration());
+      audioPlayer.current.setRate(playbackRate);
+      setIsPlaying(true);
+      audioPlayer.current.play();
+
+      toast({
+        title: "Success",
+        description: "Audio generated successfully with Kokoro TTS!",
+      });
+    } catch (error) {
+      console.error('Kokoro TTS Error:', error);
+      toast({
+        title: "Kokoro TTS Error",
+        description: "Failed to generate speech with Kokoro. Trying Google TTS as fallback...",
+        variant: "destructive",
+      });
+
+      // Fallback to Google TTS
+      await generateSpeechWithGoogle();
     }
   }
 
@@ -191,6 +294,12 @@ export default function TextToSpeechApp() {
         <h1 className="text-3xl font-light mb-8 text-center">Text to Speech</h1>
 
         <div className="space-y-6">
+          {/* Provider Toggle */}
+          <ProviderToggle
+            selectedProvider={selectedProvider}
+            onProviderChange={setSelectedProvider}
+          />
+
           {/* Text Input */}
           <div>
             <label className="block text-sm font-medium mb-2">Enter Text</label>
@@ -213,12 +322,16 @@ export default function TextToSpeechApp() {
                 <SelectContent className="bg-white/80 backdrop-blur-xl border-white/30">
                   <SelectItem value="en-US">English (US)</SelectItem>
                   <SelectItem value="en-GB">English (UK)</SelectItem>
-                  <SelectItem value="es-ES">Spanish</SelectItem>
-                  <SelectItem value="fr-FR">French</SelectItem>
-                  <SelectItem value="de-DE">German</SelectItem>
-                  <SelectItem value="ja-JP">Japanese</SelectItem>
-                  <SelectItem value="ko-KR">Korean</SelectItem>
-                  <SelectItem value="zh-CN">Chinese (Simplified)</SelectItem>
+                  {selectedProvider === 'google' && (
+                    <>
+                      <SelectItem value="es-ES">Spanish</SelectItem>
+                      <SelectItem value="fr-FR">French</SelectItem>
+                      <SelectItem value="de-DE">German</SelectItem>
+                      <SelectItem value="ja-JP">Japanese</SelectItem>
+                      <SelectItem value="ko-KR">Korean</SelectItem>
+                      <SelectItem value="zh-CN">Chinese (Simplified)</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -232,7 +345,15 @@ export default function TextToSpeechApp() {
                 <SelectContent className="bg-white/80 backdrop-blur-xl border-white/30">
                   {voices.map((voice) => (
                     <SelectItem key={voice.name} value={voice.name}>
-                      {voice.name} ({voice.ssmlGender})
+                      {selectedProvider === 'kokoro' ? (
+                        <>
+                          {voice.name} ({voice.ssmlGender})
+                          {voice.quality && <span className="text-xs opacity-70"> - {voice.quality}</span>}
+                          {voice.traits && <span className="ml-1">{voice.traits}</span>}
+                        </>
+                      ) : (
+                        `${voice.name} (${voice.ssmlGender})`
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -362,7 +483,13 @@ export default function TextToSpeechApp() {
               disabled={isLoading || !text.trim()}
               className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
             >
-              {isLoading ? "Generating..." : "Generate Speech"}
+              {isLoading ? (
+                selectedProvider === 'kokoro' && !kokoroInitialized ?
+                  "Initializing Kokoro..." :
+                  "Generating..."
+              ) : (
+                `Generate Speech (${selectedProvider === 'kokoro' ? 'Kokoro Local' : 'Google Cloud'})`
+              )}
             </Button>
           </div>
         </div>
