@@ -14,7 +14,7 @@ export default function TextToSpeechApp() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const [speed, setSpeed] = useState(1)
+  const [playbackRate, setPlaybackRate] = useState(1)
   const [pitch, setPitch] = useState(1)
   const [duration, setDuration] = useState(0)
   const [voices, setVoices] = useState<any[]>([])
@@ -70,6 +70,13 @@ export default function TextToSpeechApp() {
     }
   }, [isPlaying]);
 
+  // Update playback rate when it changes
+  useEffect(() => {
+    if (audioPlayer.current && audioUrl) {
+      audioPlayer.current.setRate(playbackRate);
+    }
+  }, [playbackRate, audioUrl]);
+
   // Generate speech from text
   async function generateSpeech() {
     if (!text.trim()) {
@@ -93,7 +100,7 @@ export default function TextToSpeechApp() {
           text,
           languageCode,
           voiceName: selectedVoice,
-          speakingRate: speed,
+          speakingRate: 1.0, // Use fixed normal speed for TTS generation
           pitch: pitch - 1, // Adjust pitch to match Google's scale (-10 to 10)
         }),
       });
@@ -104,6 +111,8 @@ export default function TextToSpeechApp() {
         setAudioUrl(data.audioUrl);
         await audioPlayer.current.loadAudio(data.audioUrl);
         setDuration(audioPlayer.current.getDuration());
+        // Apply current playback rate to the audio
+        audioPlayer.current.setRate(playbackRate);
         setIsPlaying(true);
         audioPlayer.current.play();
       } else {
@@ -168,7 +177,7 @@ export default function TextToSpeechApp() {
     setText("");
     setIsPlaying(false);
     setCurrentTime(0);
-    setSpeed(1);
+    setPlaybackRate(1);
     setPitch(1);
     setAudioUrl("");
     if (audioPlayer.current) {
@@ -234,17 +243,17 @@ export default function TextToSpeechApp() {
           {/* Parameters */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium mb-2">Speed</label>
+              <label className="block text-sm font-medium mb-2">Playback Speed</label>
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <Slider
                     defaultValue={[1]}
-                    value={[speed]}
+                    value={[playbackRate]}
                     max={2}
                     min={0.25}
                     step={0.05}
                     className="py-2"
-                    onValueChange={(value) => setSpeed(value[0])}
+                    onValueChange={(value) => setPlaybackRate(value[0])}
                   />
                   <div className="flex justify-between text-xs mt-1">
                     <span>0.25x</span>
@@ -253,7 +262,7 @@ export default function TextToSpeechApp() {
                   </div>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm px-3 py-1 rounded-lg min-w-[60px] text-center">
-                  {speed.toFixed(2)}x
+                  {playbackRate.toFixed(2)}x
                 </div>
               </div>
             </div>
