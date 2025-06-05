@@ -9,6 +9,7 @@ import { Download, Pause, Play, Volume2, VolumeX } from "lucide-react"
 import AudioPlayerService from "@/lib/audio-player-service"
 import { useToast } from "@/hooks/use-toast"
 import ProviderToggle, { TTSProvider } from "@/components/ui/provider-toggle"
+import { getKokoroService } from "@/lib/kokoro-worker-service"
 
 export default function TextToSpeechApp() {
   const [text, setText] = useState("")
@@ -151,61 +152,30 @@ export default function TextToSpeechApp() {
 
   async function generateSpeechWithKokoro() {
     try {
+      const kokoroService = getKokoroService();
+
       if (!kokoroInitialized) {
         // Show loading message for Kokoro
         toast({
           title: "Initializing Kokoro TTS",
           description: "Loading model... This may take a moment on first use.",
         });
+
+        // Initialize Kokoro using Web Worker
+        await kokoroService.initialize();
+        setKokoroInitialized(true);
       }
-
-      // Import Kokoro dynamically
-      let KokoroTTS;
-      try {
-        const kokoroModule = await import('kokoro-js');
-        KokoroTTS = kokoroModule.KokoroTTS;
-      } catch (importError) {
-        console.error('Failed to import kokoro-js:', importError);
-        throw new Error('Kokoro TTS is temporarily disabled due to Next.js compatibility issues. Please use Google TTS instead.');
-      }
-
-      // Initialize Kokoro if not already done
-      const modelId = "onnx-community/Kokoro-82M-v1.0-ONNX";
-      const tts = await KokoroTTS.from_pretrained(modelId, {
-        dtype: "q8",
-        device: "wasm",
-      });
-
-      setKokoroInitialized(true);
 
       toast({
         title: "Generating Speech",
         description: "Creating audio with Kokoro TTS...",
       });
 
-      // Generate audio
-      const audio = await tts.generate(text, {
-        voice: selectedVoice || 'af_heart',
-      });
+      // Generate audio using Web Worker
+      const audioData = await kokoroService.generateSpeech(text, selectedVoice || 'af_heart');
 
-      // Try different ways to get the audio data
-      let audioData: ArrayBuffer | Uint8Array;
-
-      if (audio.save && typeof audio.save === 'function') {
-        // Try the save method first
-        audioData = await audio.save();
-      } else if (audio.data) {
-        audioData = audio.data;
-      } else if (audio.buffer) {
-        audioData = audio.buffer;
-      } else {
-        audioData = audio;
-      }
-
-      // Convert to Uint8Array if needed
-      const audioArray = audioData instanceof ArrayBuffer ? new Uint8Array(audioData) : audioData;
-
-      // Create blob and URL
+      // Convert ArrayBuffer to Uint8Array and create blob
+      const audioArray = new Uint8Array(audioData);
       const audioBlob = new Blob([audioArray], { type: 'audio/wav' });
       const audioUrl = URL.createObjectURL(audioBlob);
 
@@ -224,7 +194,7 @@ export default function TextToSpeechApp() {
       console.error('Kokoro TTS Error:', error);
       toast({
         title: "Kokoro TTS Error",
-        description: "Failed to generate speech with Kokoro. Trying Google TTS as fallback...",
+        description: `Failed to generate speech with Kokoro: ${error.message}. Trying Google TTS as fallback...`,
         variant: "destructive",
       });
 

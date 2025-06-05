@@ -9,18 +9,13 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Temporarily disable kokoro-js to get the app working
-  serverExternalPackages: ['kokoro-js'],
-  webpack: (config, { isServer, webpack }) => {
-    // Configure for client-side only
-    if (!isServer) {
-      // Set up resolve aliases to prevent Node.js modules from being bundled
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        "sharp$": false,
-        "onnxruntime-node$": false,
-      };
+  // Following the Hugging Face Transformers.js example configuration
+  // https://github.com/huggingface/transformers.js-examples/tree/main/next-client
+  serverExternalPackages: ["@huggingface/transformers"],
 
+  // Additional webpack configuration needed for kokoro-js ONNX dependencies
+  webpack: (config, { isServer, webpack }) => {
+    if (!isServer) {
       // Set up fallbacks for Node.js modules
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -37,28 +32,28 @@ const nextConfig = {
 
       // Use IgnorePlugin to ignore node-specific modules and files
       config.plugins.push(
+        // Ignore kokoro-js completely for client-side
         new webpack.IgnorePlugin({
-          resourceRegExp: /^(lokijs|pino-pretty|encoding)$/,
+          resourceRegExp: /^kokoro-js$/,
         }),
         // Ignore onnxruntime-node completely
         new webpack.IgnorePlugin({
           resourceRegExp: /^onnxruntime-node$/,
         }),
-        // Ignore transformers node files
+        // Ignore sharp completely
         new webpack.IgnorePlugin({
-          resourceRegExp: /transformers\.node\.(mjs|cjs)$/,
+          resourceRegExp: /^sharp$/,
         }),
         // Ignore .node binary files
         new webpack.IgnorePlugin({
           resourceRegExp: /\.node$/,
         }),
-        // Temporarily ignore kokoro-js until the Next.js compatibility issue is fixed
+        // Ignore transformers node files
         new webpack.IgnorePlugin({
-          resourceRegExp: /^kokoro-js$/,
+          resourceRegExp: /transformers\.node\.(mjs|cjs)$/,
         })
       );
     }
-
     return config;
   },
 }
